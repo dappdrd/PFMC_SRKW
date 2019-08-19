@@ -526,7 +526,7 @@ server <- function(input, output) {
         #We can start by creating a data frame from the 4 metrics above: 
         #fecundity rates, survival rates, occurrence of peanut head whales. 
         
-        ind = dplyr::left_join(df_fec, df_surv, by=c("population","year")) %>% 
+        ind <- dplyr::left_join(df_fec, df_surv, by=c("population","year")) %>% 
           dplyr::left_join(peanut) %>% 
           dplyr::left_join(srkw_increase) %>% 
           dplyr::select(year,fec_rate,surv_rate,peanut_rate,increase)
@@ -546,7 +546,6 @@ server <- function(input, output) {
         ind$cluster_4 = as.factor(k4$cluster)
         
         # Correlations SRKW/Chinook Abundance; preparing outputs ---- 
-        
         
         #First, set up the data.  
         
@@ -576,6 +575,7 @@ server <- function(input, output) {
         fems_srkw_subsetyears <- subset(fems_srkw, year >= minYr & year <= maxYr)
         all_srkw_subsetyears <- subset(all_srkw, year >= minYr & year <= maxYr)
         peanut_subsetyears <- subset(peanut, year >= minYr & year <= maxYr)
+        Ind_subsetyears <- subset(ind, year >= minYr & year <= maxYr)
         
         #Processing loops through areas/time steps
         for (i in 1:length(Areas)){
@@ -597,10 +597,11 @@ server <- function(input, output) {
               #create an identifier to Timestep and area
               TSArea <- paste (Areas[i],"_TimeStep_",j, sep = "")
               
-              #Merge Surv/Fec/Peanut data sets with abundance data
+              #Merge Surv/Fec/Peanut/ind data sets with abundance data
               TempFecDat <- dplyr::left_join(TempDat, fems_srkw_subsetyears, TempDat, by="year")
               TempSurvDat <- dplyr::left_join(TempDat, all_srkw_subsetyears, TempDat, by="year")
               TempPeanutDat <- dplyr::left_join(TempDat, peanut_subsetyears, TempDat, by="year")
+              TempIndDat <- dplyr::left_join(TempDat, Ind_subsetyears, TempDat, by="year")
   
               #model fecundity as a logistic regression. Eric recommended age as a quadratic.
               Fecundityglm <- glm(gave_birth~abundance + age + I(age^2), family = binomial, data = TempFecDat)
@@ -705,6 +706,13 @@ server <- function(input, output) {
                                       fill = "gray", alpha = 0.3) + geom_line() + scale_y_continuous("Age 20 Females Giving Birth") +
                                       scale_x_continuous(paste("Chinook Abundance in ", Areas[i], " TS ", j)) + theme_classic()
               
+              #Cluster analysis
+              #Chose to use 4 clusters
+              
+              k4abund <- kproto(dplyr::select(TempIndDat,fec_rate,surv_rate,peanut_rate,increase,abundance),4)
+              TempIndDat$abundcluster_4 <- as.factor(k4abund$cluster)
+              
+              k4abund$centers = cbind("cluster"=c(1,2,3,4),k4abund$centers)
               
               #Now add plot and outputs into the Excel file
               write.xlsx(tidy(Fecundityglm), file = filePath, sheetName = TSArea, append = TRUE)
@@ -723,6 +731,7 @@ server <- function(input, output) {
               addDataFrame(tidy(Peanutglm), sheet = ws, startRow = 54, startColumn = 1)
               addDataFrame(tidy(FecundityLagOneglm), sheet = ws, startRow = 80, startColumn = 1)
               addDataFrame(tidy(FecundityLagTwoglm), sheet = ws, startRow = 106, startColumn = 1)
+              addDataFrame(k4abund$centers, sheet = ws, startRow = 132, startColumn = 1)
               unlink(PlotPath)
               
               #Set up plot path - Survival
@@ -826,101 +835,103 @@ server <- function(input, output) {
     plot_jpeg('PFMCLogo.jpg')
   })
   
+  #Commented out as I use this section for testing.
+  
   #The ProcessingButton if statements and BlankDF2 checks are to display an error message if a user tries to view a table prior to processing
-  output$Table <- renderDataTable({
-    #Display a blank data frame if no table is selected
-    if(input$table == "None"){
-      BlankDF
-    }
-    else if (input$table == "Input - FRAM Stocks"){
-      if(input$ProcessButton != 0){
-        InputDataList[[1]]
-      }
-      else{
-        BlankDF2
-      }
-    }
-    else if (input$table == "SOF Stock Abundances - Total"){
-      if(input$ProcessButton != 0){
-        SOFabundances
-      }
-      else{
-        BlankDF2
-      }
-    }
-    else if (input$table == "All Stock Abundances - Total"){
-      if(input$ProcessButton != 0){
-        cohort_Shelton_Stk
-      }
-      else{
-        BlankDF2
-      }
-    }
-    else if (input$table == "Stock Abundances by Area"){
-      if(input$ProcessButton != 0){
-        cohort_by_area
-      }
-      else{
-        BlankDF2
-      }
-    }
-    else if (input$table == "NOF Abundances by Year"){
-      if(input$ProcessButton != 0){
-        cohort_NOF
-      }
-      else{
-        BlankDF2
-      }
-    }
-    else if (input$table == "OR Abundances by Year"){
-      if(input$ProcessButton != 0){
-        cohort_OR
-      }
-      else{
-        BlankDF2
-      }
-    }
-    else if (input$table == "CALI Abundances by Year"){
-      if(input$ProcessButton != 0){
-        cohort_CALI
-      }
-      else{
-        BlankDF2
-      }
-    }
-    else if (input$table == "SWWCVI Abundances by Year"){
-      if(input$ProcessButton != 0){
-        cohort_SWWCVI
-      }
-      else{
-        BlankDF2
-      }
-    }
-    else if (input$table == "SRKW Fecundity Rates"){
-      if(input$ProcessButton != 0){
-        df_fec_display
-      }
-      else{
-        BlankDF2
-      }
-    }
-    else if (input$table == "SRKW Survival Rates"){
-      if(input$ProcessButton != 0){
-        df_surv_display
-      }
-      else{
-        BlankDF2
-      }
-    }
-    else if (input$table == "SRKW Peanut Head Data"){
-      if(input$ProcessButton != 0){
-        peanut
-      }
-      else{
-        BlankDF2
-      }
-    }
-  })
+  # output$Table <- renderDataTable({
+  #   #Display a blank data frame if no table is selected
+  #   if(input$table == "None"){
+  #     BlankDF
+  #   }
+  #   else if (input$table == "Input - FRAM Stocks"){
+  #     if(input$ProcessButton != 0){
+  #       InputDataList[[1]]
+  #     }
+  #     else{
+  #       BlankDF2
+  #     }
+  #   }
+  #   else if (input$table == "SOF Stock Abundances - Total"){
+  #     if(input$ProcessButton != 0){
+  #       SOFabundances
+  #     }
+  #     else{
+  #       BlankDF2
+  #     }
+  #   }
+  #   else if (input$table == "All Stock Abundances - Total"){
+  #     if(input$ProcessButton != 0){
+  #       cohort_Shelton_Stk
+  #     }
+  #     else{
+  #       BlankDF2
+  #     }
+  #   }
+  #   else if (input$table == "Stock Abundances by Area"){
+  #     if(input$ProcessButton != 0){
+  #       cohort_by_area
+  #     }
+  #     else{
+  #       BlankDF2
+  #     }
+  #   }
+  #   else if (input$table == "NOF Abundances by Year"){
+  #     if(input$ProcessButton != 0){
+  #       cohort_NOF
+  #     }
+  #     else{
+  #       BlankDF2
+  #     }
+  #   }
+  #   else if (input$table == "OR Abundances by Year"){
+  #     if(input$ProcessButton != 0){
+  #       cohort_OR
+  #     }
+  #     else{
+  #       BlankDF2
+  #     }
+  #   }
+  #   else if (input$table == "CALI Abundances by Year"){
+  #     if(input$ProcessButton != 0){
+  #       cohort_CALI
+  #     }
+  #     else{
+  #       BlankDF2
+  #     }
+  #   }
+  #   else if (input$table == "SWWCVI Abundances by Year"){
+  #     if(input$ProcessButton != 0){
+  #       cohort_SWWCVI
+  #     }
+  #     else{
+  #       BlankDF2
+  #     }
+  #   }
+  #   else if (input$table == "SRKW Fecundity Rates"){
+  #     if(input$ProcessButton != 0){
+  #       df_fec_display
+  #     }
+  #     else{
+  #       BlankDF2
+  #     }
+  #   }
+  #   else if (input$table == "SRKW Survival Rates"){
+  #     if(input$ProcessButton != 0){
+  #       df_surv_display
+  #     }
+  #     else{
+  #       BlankDF2
+  #     }
+  #   }
+  #   else if (input$table == "SRKW Peanut Head Data"){
+  #     if(input$ProcessButton != 0){
+  #       peanut
+  #     }
+  #     else{
+  #       BlankDF2
+  #     }
+  #   }
+  # })
 
 }
 
@@ -934,11 +945,13 @@ ui <- fluidPage(
       actionButton("EmailButton",label = "Send Input File to my Email"),
       fileInput("InputFile", "Choose Input File (.xlsx)", accept = c(".xlsx")),
       selectInput("UpColSpr", "Include Natural Mortality for Upriver Columbia Springs?", choice = c("Yes", "No")),
-      actionButton("ProcessButton",label = "Begin Processing/Email Outputs"),
-      selectInput("table", "Please choose a table to display",
-                  choices = c("None","Input - FRAM Stocks", "SOF Stock Abundances - Total", "All Stock Abundances - Total", 
-                              "Stock Abundances by Area", "NOF Abundances by Year", "OR Abundances by Year", "CALI Abundances by Year",
-                              "SWWCVI Abundances by Year", "SRKW Fecundity Rates", "SRKW Survival Rates", "SRKW Peanut Head Data"))
+      actionButton("ProcessButton",label = "Begin Processing/Email Outputs")
+      #Commented out as I use this section for testing.
+      # actionButton("ProcessButton",label = "Begin Processing/Email Outputs"),
+      # selectInput("table", "Please choose a table to display",
+      #             choices = c("None","Input - FRAM Stocks", "SOF Stock Abundances - Total", "All Stock Abundances - Total", 
+      #                         "Stock Abundances by Area", "NOF Abundances by Year", "OR Abundances by Year", "CALI Abundances by Year",
+      #                         "SWWCVI Abundances by Year", "SRKW Fecundity Rates", "SRKW Survival Rates", "SRKW Peanut Head Data"))
 
     ),
     #Main panel is for graphics
